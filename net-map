@@ -1,0 +1,105 @@
+[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Drawing") 
+[void] [System.Reflection.Assembly]::LoadWithPartialName("System.Windows.Forms")  
+
+$Form = New-Object System.Windows.Forms.Form    
+$Form.Size = New-Object System.Drawing.Size(600,400)  
+
+############################################## Start functions
+$dict = @{}
+function parse-netstat {
+
+$netstat = netstat -n
+
+
+
+$netstat = netstat -n
+$netstat = $netstat[4..$netstat.Length]
+    foreach ($line in $netstat) {
+        $col = ($line.Trim() -replace "\s+"," ").split()
+        if ($col -match "^127\.0\.0\.1.*") {
+            break
+        } else {
+            #yoink them ports
+            $pair = $col[2].split(":")
+            #storinator them
+            if ($dict.($pair[0])) {
+                if ($dict.($pair[0]).add($pair[1])) {
+                    $outputBox.AppendText("new port found for existing remote IP, " + $pair[0] + ": " + $pair[1] + "`r`n")
+                }
+            } else {
+                $outputBox.AppendText("new remote ip found, " + $pair[0] + ": " + $pair[1] + "`r`n")
+                $set = New-Object System.Collections.Generic.HashSet[int]
+                $hush = $set.add($pair[1])
+                $hush = $dict.Add($pair[0],$set)
+            }
+        } 
+    }
+    $outputBox2.text = ("RemoteIP   Port`r`n")
+    foreach ($key in $dict.keys) {
+        if (!($dict.$key.Contains(443) -and $dict.$key.count -eq 1)) {
+           $outputBox2.text += ($key + ":     " + $dict.$key + "`r`n")
+        }
+    }
+    
+    
+}
+
+
+############################################## end functions
+
+############################################## Start text fields
+$outputBox = New-Object System.Windows.Forms.TextBox 
+$outputBox.Location = New-Object System.Drawing.Size(10,10) 
+$outputBox.Size = New-Object System.Drawing.Size(500,400) 
+$outputBox.MultiLine = $True 
+$outputBox.Scrollbars = "Vertical" 
+$Form.Controls.Add($outputBox) 
+
+$outputBox2 = New-Object System.Windows.Forms.TextBox 
+$outputBox2.Location = New-Object System.Drawing.Size(10,415) 
+$outputBox2.Size = New-Object System.Drawing.Size(900,400) 
+$outputBox2.MultiLine = $True
+$outputBox2.Scrollbars = "Vertical" 
+$outputbox2.Text = "waiting"
+$Form.Controls.Add($outputBox2)
+
+
+
+
+############################################## end text fields
+
+############################################## Start buttons
+$Button = New-Object System.Windows.Forms.Button 
+$Button.Location = New-Object System.Drawing.Size(900,30) 
+$Button.Size = New-Object System.Drawing.Size(110,80) 
+$Button.Text = "start" 
+$ii = 0
+$Button.Add_Click({
+   
+        while ($true) {
+            parse-netstat
+            $outputbox.Update()
+            $outputbox2.Update()
+            $timeout = New-TimeSpan -Seconds 3
+            $timer = [diagnostics.stopwatch]::StartNew()
+            while ($timer.Elapsed -lt $timeout) {
+                [System.Windows.Forms.Application]::DoEvents()
+            }
+        }
+    
+}) 
+$Form.Controls.Add($Button) 
+
+
+$Button2 = New-Object System.Windows.Forms.Button 
+$Button2.Location = New-Object System.Drawing.Size(800,30) 
+$Button2.Size = New-Object System.Drawing.Size(110,80) 
+$Button2.Text = "save" 
+$Button2.add_click({
+    $dict > "~\Desktop\netsats\netstatsfromsavebutton.txt"
+})
+$Form.Controls.Add($Button2) 
+############################################## end buttons
+
+$Form.Add_Shown({$Form.Activate()})
+[void] $Form.ShowDialog()
